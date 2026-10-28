@@ -83,7 +83,6 @@ def logout():
         token = request.cookies.get("token")
         if not token:
             return jsonify({"message": "logout success"}), 200
-        print('Elos 0')
         token = sessions.delete_token(token)
         logger.info (token)
         response = make_response(jsonify({

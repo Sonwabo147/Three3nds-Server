@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, make_response, g
 import models.users as users 
 import models.properties as properties
+import models.res_properties as res_properties
 import models.veri_code as veri_code
 from send_email import send_email
 import time
@@ -113,7 +114,6 @@ def add_property():
             "photos": json.dumps(saved_photos)
         }
 
-        logging.info("Data %s", data)
 
         properties.add(data)
 
@@ -128,13 +128,97 @@ def add_property():
 
 
 
+@property_bp.route("/add_res", methods=["POST"])
+def add_res_property():
+    try:
+        if not g.auth:
+            return jsonify({"error": "Not authorized"}), 401
+
+        # Property ID
+        pid = str(uuid.uuid4())
+        # Form data
+        title = request.form.get("title")
+        monthly_rental = request.form.get("monthlyRental")
+        deposit = request.form.get("deposit")
+        location = request.form.get("location")
+        size = request.form.get("size")
+        property_condition = request.form.get("condition")
+        status = request.form.get("availability")
+        parking = json.loads(request.form.get("parking", "[]"))
+        water = json.loads(request.form.get("water", "[]"))
+        power = json.loads(request.form.get("power", "[]"))
+
+        statusOptions = ["Available", "Reserved", "Rented", "Unavailable"]
+
+        if not title:
+            return jsonify({"error": "Property title is required"}), 400
+
+        if not location:
+            return jsonify({"error": "Property location is required"}), 400
+
+        if not status in statusOptions:
+            return jsonify({"error": "Invalid availability status"}), 400
+
+        # Create upload folder
+        property_folder = os.path.join( "public", "users", g.user['uid'], "properties",pid)
+
+        os.makedirs(property_folder, exist_ok=True)
+
+        # Save uploaded photos
+        saved_photos = []
+
+        for photo in request.files.getlist("photos"):
+            if photo.filename == "":
+                continue
+            filename = secure_filename(photo.filename)
+            ext = os.path.splitext(filename)[1]
+            filename = f"{uuid.uuid4()}{ext}"
+            photo.save(os.path.join(property_folder, filename))
+            if os.getenv("ENV") == 'dev':
+                saved_photos.append(
+                    f"http://localhost:5000/public/users/{g.user['uid']}/properties/{pid}/{filename}"
+                )
+            else:
+                saved_photos.append(
+                    f"https://threeends.api.vibstar.co.za/public/users/{g.user['uid']}/properties/{pid}/{filename}"
+                )
+        # Data to save
+        data = {
+            "pid": pid,
+            "uid": g.user['uid'],
+            "title": title,
+            "monthly_rental": monthly_rental,
+            "deposit": deposit,
+            "location": location,
+            "size": size,
+            "parking": json.dumps(parking),
+            "availability": status,
+            "condition": property_condition,
+            "water": json.dumps(water),
+            "power": json.dumps(power),
+            "photos": json.dumps(saved_photos)
+        }
+
+        logging.info("Data %s", data)
+
+        res_properties.add(data)
+
+        return jsonify({
+            "success": "Residential property created successfully",
+            "pid": pid
+        }), 201
+
+    except Exception as e:
+        logger.exception(e)
+        return jsonify({"error": "Internal server error"}), 500
+
 @property_bp.route("/get/<pid>", methods=["GET"])
 def getProperty(pid):
     try:
         # if not g.superAuth:
         #     return jsonify({"error": "Not authorized"}), 401
         
-        property = properties.get_id (pid)
+        property = res_properties.get_id (pid)
 
         if not property:
             return jsonify({"error": "Property not found"}), 404
@@ -146,6 +230,21 @@ def getProperty(pid):
        logger.error("Internal Error @biz_bp getProperty: %s", e)
        return jsonify({"error": "Internal server error"}), 500
 
+@property_bp.route("/getRes/<pid>", methods=["GET"])
+def getResProperty(pid):
+    try:
+        
+        property = res_properties.get_id (pid)
+
+        if not property:
+            return jsonify({"error": "Property not found"}), 404
+
+        property['user'] = users.get_id(property['uid'])
+        return property, 200
+    
+    except Exception as e:
+       logger.error("Internal Error @biz_bp getProperty: %s", e)
+       return jsonify({"error": "Internal server error"}), 500
 
 
 @property_bp.route("/getUser/<uid>", methods=["GET"])
@@ -179,3 +278,60 @@ def getAllProperties():
        logger.error("Internal Error @property_bp getAllProperties: %s", e)
        return jsonify({"error": "Internal server error"}), 500
 
+
+@property_bp.route("/getAllRes", methods=["GET"])
+def getAllResProperties():
+    try:
+        # if not g.superAuth:
+        #     return jsonify({"error": "Not authorized"}), 401
+        
+        all_properties = res_properties.get_all ()
+
+        if not all_properties:
+            # return
+            return jsonify({"error": "No Properties found"}), 403
+        return all_properties, 200
+    
+    except Exception as e:
+       logger.error("Internal Error @property_bp getAllProperties: %s", e)
+       return jsonify({"error": "Internal server error"}), 500
+
+
+@property_bp.route("/updateStatus", methods=["POST"])
+def updateStatus():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request body is required"}), 402
+
+        if not g.auth:
+            return jsonify({"error": "Not Authenticated"}), 402
+
+        if not g.user['agent']:
+            return jsonify({"error": "Not Authorized"}), 402
+
+        pid = data.get("pid")
+        status = data.get("status")
+
+        status_options = ['Available', 'Unvailable', 'Rented', 'Reserved']
+
+        if not pid:
+            return jsonify({"error": "Property ID is required"}), 402
+
+        property = res_properties.get_id(pid)
+        logging.info("Status %s", status)
+
+        if not property:
+            return jsonify({"error": "Property not found"}), 402
+
+        if property['uid'] != g.user['uid']:
+            return jsonify({"error": "You cannot change status of this property"}), 402
+
+        if status not in status_options:
+             return jsonify({"error": "Invalid status"}), 402
+        
+        property = res_properties.update_id(pid, {"availability": status})
+        return {"success": "Status is updated successfully", "id": pid}, 200
+
+    except Exception as e:
+        logger.error("Internal Error @propertys_bp enquiry: %s", e)
