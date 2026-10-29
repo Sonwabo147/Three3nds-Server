@@ -50,6 +50,7 @@ def add_property():
         power_plan = json.loads(request.form.get("power", "[]"))
         nearby_businesses = request.form.get("nearbyBusinesses")
         gps_location = request.form.get("gpsLocation")
+        
 
         # Validation
         if not uid:
@@ -111,7 +112,8 @@ def add_property():
             "visibility": visibility,
             "nearby_businesses": nearby_businesses,
             "gps_location": gps_location,
-            "photos": json.dumps(saved_photos)
+            "photos": json.dumps(saved_photos),
+            
         }
 
 
@@ -147,6 +149,8 @@ def add_res_property():
         parking = json.loads(request.form.get("parking", "[]"))
         water = json.loads(request.form.get("water", "[]"))
         power = json.loads(request.form.get("power", "[]"))
+        landlord_name = request.form.get("landlordName")
+        landlord_phone = request.form.get("landlordPhone")
 
         statusOptions = ["Available", "Reserved", "Rented", "Unavailable"]
 
@@ -196,10 +200,12 @@ def add_res_property():
             "condition": property_condition,
             "water": json.dumps(water),
             "power": json.dumps(power),
-            "photos": json.dumps(saved_photos)
+            "photos": json.dumps(saved_photos),
+            "landlord_name": landlord_name,
+            "landlord_phone": landlord_phone
         }
 
-        logging.info("Data %s", data)
+        # logging.info("Data %s", data)
 
         res_properties.add(data)
 

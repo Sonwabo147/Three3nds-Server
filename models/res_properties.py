@@ -69,15 +69,16 @@ def add(data):
         cursor = conn.cursor (buffered=True)
         # Insert new user
         insert_user_query = """
-            INSERT INTO res_properties (pid, uid, title, location, monthly_rental, size, parking, availability, property_condition, water, power, photos)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO res_properties (pid, uid, title, location, monthly_rental, size, parking, availability, property_condition, water, power, photos, landlord_name, landlord_phone)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         cursor.execute(insert_user_query, (
             data['pid'], data['uid'], data["title"], 
             data["location"], data["monthly_rental"], 
             data["size"], data["parking"],
             data["availability"], data["condition"],
-            data["water"], data["power"], data['photos']
+            data["water"], data["power"], data['photos'],
+            data['landlord_name'], data['landlord_phone']
         ))
         conn.commit()
         return data['pid']
@@ -120,7 +121,7 @@ def update_id (id, updates):
         values.append(id)
         cursor.execute(query, values)
         conn.commit()
-        return {"success": "Updated User"}
+        return {"success": "Updated Property"}
         
     except Exception as e:
         raise Exception (e)
